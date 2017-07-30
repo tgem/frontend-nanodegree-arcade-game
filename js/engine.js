@@ -14,6 +14,16 @@
  * a little simpler to work with.
  */
 
+/* Assumes the following global variables have been set by app.js before:
+Dimensions of the game area
+var numRows;
+var numCols;
+
+Pixel size of each board piece
+var fieldX; 
+var fieldY; 
+*/
+
 var Engine = (function(global) {
     /* Predefine the variables we'll be using within this scope,
      * create the canvas element, grab the 2D context for that canvas
@@ -70,17 +80,15 @@ var Engine = (function(global) {
     }
 
     /* This function is called by main (our game loop) and itself calls all
-     * of the functions which may need to update entity's data. Based on how
-     * you implement your collision detection (when two entities occupy the
-     * same space, for instance when your character should die), you may find
-     * the need to add an additional function call here. For now, we've left
-     * it commented out - you may or may not want to implement this
-     * functionality this way (you could just implement collision detection
-     * on the entities themselves within your app.js file).
+     * of the functions which may need to update entity's data.
      */
     function update(dt) {
         updateEntities(dt);
-        // checkCollisions();
+
+        // if any message to the player is currently shown, reduce elapsed time from its remaining time
+        if(messageTimer>0) {
+            messageTimer = messageTimer-dt;
+        };
     }
 
     /* This is called by the update function and loops through all of the
@@ -91,9 +99,23 @@ var Engine = (function(global) {
      * render methods.
      */
     function updateEntities(dt) {
-        allEnemies.forEach(function(enemy) {
-            enemy.update(dt);
-        });
+        // since we don't want to remove entries from an array while iterating over it,
+        // obsolete gathers indices of all entries that need to be removed later
+        var obsolete = [];
+
+        for(var i=0;i<allEnemies.length;i++) {
+            allEnemies[i].update(dt);
+            if(allEnemies[i].active===false) {
+                obsolete.push(i);
+            }
+        }
+
+        // remove and replace all Enemies identified as obsolete since they left the screen
+        for(var j=obsolete.length-1;j>=0;j--) {
+            allEnemies.splice(obsolete[j],1);
+            allEnemies.push(new Enemy());
+        }
+
         player.update();
     }
 
@@ -115,8 +137,6 @@ var Engine = (function(global) {
                 'images/grass-block.png',   // Row 1 of 2 of grass
                 'images/grass-block.png'    // Row 2 of 2 of grass
             ],
-            numRows = 6,
-            numCols = 5,
             row, col;
 
         /* Loop through the number of rows and columns we've defined above
@@ -132,11 +152,20 @@ var Engine = (function(global) {
                  * so that we get the benefits of caching these images, since
                  * we're using them over and over.
                  */
-                ctx.drawImage(Resources.get(rowImages[row]), col * 101, row * 83);
+                ctx.drawImage(Resources.get(rowImages[row]), col * fieldX, row * fieldY);
             }
         }
 
         renderEntities();
+
+        // display message to the player in the middle of the screen, if any
+        if(messageTimer>0) {
+            ctx.fillStyle = 'yellow';
+            ctx.font = '36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+        }
     }
 
     /* This function is called by the render function and is called on each game
